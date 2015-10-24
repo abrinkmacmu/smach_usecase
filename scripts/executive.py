@@ -38,21 +38,29 @@ def main():
             ServiceState('turtle2/teleport_absolute',
             turtlesim.srv.TeleportAbsolute,
             request = turtlesim.srv.TeleportAbsoluteRequest(9.0,5.0,0)),
-            transitions={'succeeded':'BIG'})
+            transitions={'succeeded':'DRAW_SHAPES'})
         
-        smach.StateMachine.add('BIG',
-            SimpleActionState('turtle_shape1',
-            turtle_actionlib.msg.ShapeAction,
-            goal=turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0) ),
-            transitions={'succeeded':'SMALL'})
+        # Create concurrence container
+        sm_con = smach.Concurrence( outcomes=['succeeded','preempted','aborted'],
+            default_outcome = 'aborted',
+            outcome_map={'succeeded': {'BIG':'succeeded' , 'SMALL':'succeeded'}})
+
+        smach.StateMachine.add('DRAW_SHAPES', sm_con,
+            transitions={'succeeded': 'succeeded'})
+
+        with sm_con:
+
+            smach.Concurrence.add('BIG',
+                SimpleActionState('turtle_shape1',
+                turtle_actionlib.msg.ShapeAction,
+                goal=turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0) ))
+            
+            smach.Concurrence.add('SMALL',
+                SimpleActionState('turtle_shape2',
+                turtle_actionlib.msg.ShapeAction,
+                goal=turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 0.5) ))
+
         
-        smach.StateMachine.add('SMALL',
-            SimpleActionState('turtle_shape2',
-            turtle_actionlib.msg.ShapeAction,
-            goal=turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 0.5) ),
-            transitions={'succeeded':'succeeded',
-                         'preempted':'preempted',
-                         'aborted'  :'aborted'})
 
      #start introspection server to use smach_viewer.py
     sis = smach_ros.IntrospectionServer('server_name', sm_root, '/SM_ROOT')
