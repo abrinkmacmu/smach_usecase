@@ -40,20 +40,16 @@ def main():
             request = turtlesim.srv.TeleportAbsoluteRequest(9.0,5.0,0)),
             transitions={'succeeded':'BIG'})
         
-        turtle1goal = turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0)
-        
         smach.StateMachine.add('BIG',
             SimpleActionState('turtle_shape1',
             turtle_actionlib.msg.ShapeAction,
-            goal=turtle1goal ),
+            goal=turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0) ),
             transitions={'succeeded':'SMALL'})
-                         
-        turtle2goal = turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0)
         
         smach.StateMachine.add('SMALL',
             SimpleActionState('turtle_shape2',
             turtle_actionlib.msg.ShapeAction,
-            goal=turtle2goal ),
+            goal=turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 0.5) ),
             transitions={'succeeded':'succeeded',
                          'preempted':'preempted',
                          'aborted'  :'aborted'})
