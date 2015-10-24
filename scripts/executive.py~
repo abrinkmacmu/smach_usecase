@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+import roslib; roslib.load_manifest('smach_usecase')
+import rospy
+import std_srvs.srv
+import smach
+import smach_ros
+import turtlesim.srv
+import turtle_actionlib.msg
+from smach_ros import ServiceState
+from smach_ros import SimpleActionState
+
+def main():
+    rospy.init_node('smach_usecase_executive')
+
+    sm_root = smach.StateMachine(outcomes=['succeeded','preempted','aborted']) 
+    
+    with sm_root:
+        #add state to call ROS service by turtlesim to reset sim
+        smach.StateMachine.add('RESET',
+            ServiceState('reset',
+            std_srvs.srv.Empty),
+            transitions={'succeeded':'SPAWN'})
+        #add state to spawn new turtle at 0,0 called turtle2
+        smach.StateMachine.add('SPAWN',
+            ServiceState('spawn',
+            turtlesim.srv.Spawn,
+            request = turtlesim.srv.SpawnRequest(0,0,0,'turtle2')),
+            transitions={'succeeded':'TELEPORT1'})
+
+        smach.StateMachine.add('TELEPORT1',
+            ServiceState('turtle1/teleport_absolute',
+            turtlesim.srv.TeleportAbsolute,
+            request = turtlesim.srv.TeleportAbsoluteRequest(5.0,1.0,0)),
+            transitions={'succeeded':'TELEPORT2'})
+            
+        smach.StateMachine.add('TELEPORT2',
+            ServiceState('turtle2/teleport_absolute',
+            turtlesim.srv.TeleportAbsolute,
+            request = turtlesim.srv.TeleportAbsoluteRequest(9.0,5.0,0)),
+            transitions={'succeeded':'BIG'})
+        
+        turtle1goal = turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0)
+        
+        smach.StateMachine.add('BIG',
+            SimpleActionState('turtle_shape1',
+            turtle_actionlib.msg.ShapeAction,
+            goal=turtle1goal ),
+            transitions={'succeeded':'SMALL'})
+                         
+        turtle2goal = turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 5.0)
+        
+        smach.StateMachine.add('SMALL',
+            SimpleActionState('turtle_shape2',
+            turtle_actionlib.msg.ShapeAction,
+            goal=turtle2goal ),
+            transitions={'succeeded':'succeeded',
+                         'preempted':'preempted',
+                         'aborted'  :'aborted'})
+
+     #start introspection server to use smach_viewer.py
+    sis = smach_ros.IntrospectionServer('server_name', sm_root, '/SM_ROOT')
+    sis.start()
+    
+    outcome = sm_root.execute()
+
+    rospy.spin()
+
+if __name__=='__main__':
+    main()
