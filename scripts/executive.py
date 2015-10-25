@@ -24,13 +24,24 @@ def monitor_callback(ud, turtle1pose):
     global turtle2pose
     dist = ((turtle1pose.x-turtle2pose.x)**2.0 + (turtle1pose.y-turtle2pose.y)**2.0 )**(1/2.0)
     rospy.loginfo('distance between turtles: %s',dist)
-    if(dist < 1.0):
+    if(dist < 2.0):
         return False
     else:    
         return True
 
+def wait_for_clear_callback(ud,turtle1pose):
+    global turtle2pose
+    dist = ((turtle1pose.x-turtle2pose.x)**2.0 + (turtle1pose.y-turtle2pose.y)**2.0 )**(1/2.0)
+    rospy.loginfo('distance between turtles: %s',dist)
+    if(dist < 2.0):
+        return True
+    else:    
+        return False
+
 def child_term_cb(outcome_map):
     if outcome_map['MONITOR'] == 'invalid':
+        return True
+    elif outcome_map['DRAW'] == 'succeeded':
         return True
     else:
         return False
@@ -61,50 +72,65 @@ def main():
             ServiceState('turtle1/teleport_absolute',
             turtlesim.srv.TeleportAbsolute,
             request = turtlesim.srv.TeleportAbsoluteRequest(5.0,1.0,0)),
-            transitions={'succeeded':'TELEPORT2'})
-            
-        smach.StateMachine.add('TELEPORT2',
-            ServiceState('turtle2/teleport_absolute',
-            turtlesim.srv.TeleportAbsolute,
-            request = turtlesim.srv.TeleportAbsoluteRequest(9.0,5.0,0)),
             transitions={'succeeded':'DRAW_SHAPES'})
         
-        # Create concurrence container
-        sm_con = smach.Concurrence( outcomes=['succeeded','preempted','aborted'],
+        # Create DRAW SHAPES container
+        sm_draw_shapes = smach.Concurrence( outcomes=['succeeded','preempted','aborted'],
             default_outcome = 'aborted',
             outcome_map={'succeeded': {'BIG':'succeeded' , 'SMALL':'succeeded'}})
 
-        smach.StateMachine.add('DRAW_SHAPES', sm_con,
+        smach.StateMachine.add('DRAW_SHAPES', sm_draw_shapes,
             transitions={'succeeded': 'succeeded'})
 
-        with sm_con:
+        with sm_draw_shapes:
 
             smach.Concurrence.add('BIG',
                 SimpleActionState('turtle_shape1',
                 turtle_actionlib.msg.ShapeAction,
                 goal=turtle_actionlib.msg.ShapeGoal(edges = 11, radius = 4.0) ))
             
-            #Create Small container to run the DRAW state and MONITOR state
-            sm_small_monitor = smach.Concurrence( outcomes=['succeeded','preempted','aborted'],
-                default_outcome = 'aborted',
-                child_termination_cb = child_term_cb,
-                outcome_map={'succeeded': {'DRAW': 'succeeded'},
-                             'preempted': {'DRAW': 'preempted', 'MONITOR':'preempted'},
-                             'aborted'  : {'MONITOR': 'invalid'} })
+            #Create SMALL container
+            sm_small = smach.StateMachine( outcomes=['succeeded','preempted','aborted'])
 
-            smach.Concurrence.add('SMALL', sm_small_monitor)
+            smach.Concurrence.add('SMALL', sm_small)
 
-            with sm_small_monitor:
+            with sm_small:
 
-                smach.Concurrence.add('DRAW',
-                    SimpleActionState('turtle_shape2',
-                    turtle_actionlib.msg.ShapeAction,
-                    goal=turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 0.5) ))
+                smach.StateMachine.add('TELEPORT2',
+                    ServiceState('turtle2/teleport_absolute',
+                    turtlesim.srv.TeleportAbsolute,
+                    request = turtlesim.srv.TeleportAbsoluteRequest(9.0,5.0,0)),
+                    transitions={'succeeded':'DRAW_WITH_MONITOR'})
 
-                smach.Concurrence.add('MONITOR',
+                smach.StateMachine.add('WAIT_FOR_CLEAR',
                     MonitorState("turtle1/pose",
                     turtlesim.msg.Pose,
-                    monitor_callback))
+                    wait_for_clear_callback),
+                    transitions={'invalid':'TELEPORT2',
+                                  'valid':'WAIT_FOR_CLEAR'})
+
+                #Create DRAW WITH MONITOR 
+                sm_draw_with_monitor = smach.Concurrence( outcomes=['succeeded','preempted','aborted','interrupted'],
+                    default_outcome = 'aborted',
+                    child_termination_cb = child_term_cb,
+                    outcome_map={'succeeded': {'DRAW': 'succeeded', 'MONITOR':'valid'},
+                                 'preempted': {'DRAW': 'preempted', 'MONITOR':'preempted'},
+                                 'interrupted' : {'MONITOR': 'invalid'} })
+
+                smach.StateMachine.add('DRAW_WITH_MONITOR', sm_draw_with_monitor,
+                    transitions={'interrupted':'WAIT_FOR_CLEAR'})
+
+                with sm_draw_with_monitor:
+
+                    smach.Concurrence.add('DRAW',
+                        SimpleActionState('turtle_shape2',
+                        turtle_actionlib.msg.ShapeAction,
+                        goal=turtle_actionlib.msg.ShapeGoal(edges = 6, radius = 0.5) ))
+
+                    smach.Concurrence.add('MONITOR',
+                        MonitorState("turtle1/pose",
+                        turtlesim.msg.Pose,
+                        monitor_callback))
 
         
 
