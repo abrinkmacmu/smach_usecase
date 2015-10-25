@@ -9,7 +9,7 @@ import smach_ros
 import turtlesim.srv
 import turtlesim.msg
 import turtle_actionlib.msg
-from actionlib_msgs import *
+import actionlib_msgs
 from smach_ros import ServiceState
 from smach_ros import SimpleActionState
 from smach_ros import MonitorState
@@ -55,7 +55,10 @@ def main():
 
     rospy.Subscriber("turtle2/pose", turtlesim.msg.Pose, turtle2pose_cb)
 
-    sm_root = smach.StateMachine(outcomes=['succeeded','preempted','aborted']) 
+    sm_root = smach.StateMachine(
+        outcomes=['succeeded','preempted','aborted'])
+        #input_keys = ['my_awesome_goal'],
+        #output_keys= ['some_awesome_result']) 
     
     with sm_root:
         #add state to call ROS service by turtlesim to reset sim
@@ -135,7 +138,7 @@ def main():
                         monitor_callback))
 
         
-''' Commented out to run as actionlib server
+# Commented out to run as actionlib server
      #start introspection server to use smach_viewer.py
     sis = smach_ros.IntrospectionServer('server_name', sm_root, '/SM_ROOT')
     sis.start()
@@ -153,8 +156,8 @@ def main():
     sm_root.request_preempt()
 '''
 asw = ActionServerWrapper(
-        'smach_usecase_server', goal,
-        warapped_container = sm_root,
+        'smach_usecase_server', actionlib_msgs.msg.GoalID,
+        wrapped_container = sm_root,
         succeeded_outcomes = ['succeeded'],
         aborted_outcomes = ['aborted'],
         preempted_outcomes = ['preempted'])
@@ -162,6 +165,7 @@ asw = ActionServerWrapper(
 aws.run_server()
 
 rospy.spin()    
+'''
 
 if __name__=='__main__':
     main()
