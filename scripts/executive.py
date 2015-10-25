@@ -23,7 +23,7 @@ def monitor_callback(ud, turtle1pose):
 
     global turtle2pose
     dist = ((turtle1pose.x-turtle2pose.x)**2.0 + (turtle1pose.y-turtle2pose.y)**2.0 )**(1/2.0)
-    rospy.loginfo('distance between turtles: %f',dist)
+    rospy.loginfo('distance between turtles: %s',dist)
     if(dist < 1.0):
         return False
     else:    
