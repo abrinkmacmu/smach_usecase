@@ -9,9 +9,11 @@ import smach_ros
 import turtlesim.srv
 import turtlesim.msg
 import turtle_actionlib.msg
+from actionlib_msgs import *
 from smach_ros import ServiceState
 from smach_ros import SimpleActionState
 from smach_ros import MonitorState
+from smach_ros import ActionServerWrapper
 turtle2pose = turtlesim.msg.Pose
 def turtle2pose_cb(data):
     global turtle2pose
@@ -133,12 +135,10 @@ def main():
                         monitor_callback))
 
         
-
+''' Commented out to run as actionlib server
      #start introspection server to use smach_viewer.py
     sis = smach_ros.IntrospectionServer('server_name', sm_root, '/SM_ROOT')
     sis.start()
-
-
 
     # Execute SMACH tree in a separate thread so that we can ctrl-c the script
     smach_thread = threading.Thread(target = sm_root.execute)
@@ -151,8 +151,17 @@ def main():
     sis.stop()
 
     sm_root.request_preempt()
+'''
+asw = ActionServerWrapper(
+        'smach_usecase_server', goal,
+        warapped_container = sm_root,
+        succeeded_outcomes = ['succeeded'],
+        aborted_outcomes = ['aborted'],
+        preempted_outcomes = ['preempted'])
 
-    
+aws.run_server()
+
+rospy.spin()    
 
 if __name__=='__main__':
     main()
